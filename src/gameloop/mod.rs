@@ -51,18 +51,21 @@ impl <'a> GameLoop<'a> {
                         break 'play_loop
                     },
 
+                    Event::KeyDown { keycode: Some(Keycode::Left), .. } |
                     Event::KeyDown { keycode: Some(Keycode::A), .. } => {
                         if g.slide(-1) {
                             changed = true;
                         }
                     },
 
+                    Event::KeyDown { keycode: Some(Keycode::Right), .. } |
                     Event::KeyDown { keycode: Some(Keycode::D), .. } => {
                         if g.slide(1) {
                             changed = true;
                         }
                     },
 
+                    Event::KeyDown { keycode: Some(Keycode::Down), .. } |
                     Event::KeyDown { keycode: Some(Keycode::S), .. } => {
                         if g.down() {
                             changed = true;
@@ -73,6 +76,11 @@ impl <'a> GameLoop<'a> {
                     },
 
                     Event::KeyDown {
+                        keycode: Some(Keycode::Up),
+                        keymod: sdl2::keyboard::Mod::LSHIFTMOD,
+                        ..
+                    } |
+                    Event::KeyDown {
                         keycode: Some(Keycode::W), 
                         keymod: sdl2::keyboard::Mod::LSHIFTMOD,
                         ..
@@ -82,6 +90,11 @@ impl <'a> GameLoop<'a> {
                         }
                     },
 
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Up),
+                        keymod: sdl2::keyboard::Mod::NOMOD,
+                        ..
+                    } |
                     Event::KeyDown {
                         keycode: Some(Keycode::W), 
                         keymod: sdl2::keyboard::Mod::NOMOD,
