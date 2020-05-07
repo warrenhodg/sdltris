@@ -10,7 +10,12 @@ edition = "2018"
 git = "https://github.com/warrenhodg/rustris"
 tag = "1.0.2"
 
+[dependencies.texturemanager]
+git = "https://github.com/warrenhodg/texturemanager"
+tag = "1.0.0"
+
+
 [dependencies.sdl2]
 version = "0.34.0"
 default-features = false
-features = ["ttf"]
+features = ["image"]

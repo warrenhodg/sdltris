@@ -1,45 +1,37 @@
 extern crate rustris;
 extern crate sdl2;
+extern crate texturemanager;
 
+use std::rc::Rc;
 use super::Game;
 use super::Output;
+use texturemanager::TextureManager;
 
-pub struct Sdl {
+pub struct Sdl<T> {
     w: isize,
     h: isize,
     title_top_left: Option<sdl2::rect::Rect>,
     board_top_left: Option<sdl2::rect::Rect>,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
+
+    phantom: std::marker::PhantomData<T>,
 }
 
-impl Sdl {
-    pub fn new<'a>(sdl_context: &sdl2::Sdl) -> Box<dyn Output + 'a> {
-        let video_subsystem: sdl2::VideoSubsystem = sdl_context.video().unwrap();
-
+impl <T> Sdl<T> {
+    pub fn new<'a>(video_subsystem: &sdl2::VideoSubsystem, canvas: sdl2::render::Canvas<sdl2::video::Window>) -> Sdl<T> {
         let screen_size: sdl2::rect::Rect = video_subsystem.display_bounds(0).unwrap();
 
-        let window: sdl2::video::Window = video_subsystem.window("rustris", screen_size.width(), screen_size.height())
-            .position_centered()
-            .fullscreen()
-            .opengl()
-            .build()
-            .unwrap();
-
-        let canvas: sdl2::render::Canvas<sdl2::video::Window> = sdl2::render::CanvasBuilder::new(window)
-            .build()
-            .unwrap();
-
-        Box::new(Sdl {
+        Sdl::<T> {
             w: screen_size.width() as isize,
             h: screen_size.height() as isize,
             canvas: canvas,
             title_top_left: Option::None,
             board_top_left: Option::None,
-        })
+            phantom: std::marker::PhantomData,
+        }
     }
 
-    fn resize(w: u32, h: u32, nw: u32, nh: u32) -> (u32, u32) 
-    {
+    fn resize(w: u32, h: u32, nw: u32, nh: u32) -> (u32, u32) {
         let rh = h * nw / w;
         if rh > nh {
             (w * nh / h, nh)
@@ -48,17 +40,17 @@ impl Sdl {
         }
     }
 
-    fn get_color(colour: rustris::Colour) -> sdl2::pixels::Color {
+    fn get_texture_name(colour: rustris::Colour) -> String {
         match colour {
-            rustris::Colour::Wall => sdl2::pixels::Color::GRAY,
-            rustris::Colour::Value(0) => sdl2::pixels::Color::RGB(255, 196, 196),
-            rustris::Colour::Value(1) => sdl2::pixels::Color::RGB(255, 255, 196),
-            rustris::Colour::Value(2) => sdl2::pixels::Color::RGB(196, 255, 196),
-            rustris::Colour::Value(3) => sdl2::pixels::Color::RGB(196, 255, 255),
-            rustris::Colour::Value(4) => sdl2::pixels::Color::RGB(196, 196, 255),
-            rustris::Colour::Value(5) => sdl2::pixels::Color::RGB(255, 196, 255),
-            rustris::Colour::Value(6) => sdl2::pixels::Color::RGB(255, 226, 196),
-            _ => sdl2::pixels::Color::RGB(32, 32, 32),
+            rustris::Colour::Wall => "wall.png".to_string(),
+            rustris::Colour::Value(0) => "0.png".to_string(),
+            rustris::Colour::Value(1) => "1.png".to_string(),
+            rustris::Colour::Value(2) => "2.png".to_string(),
+            rustris::Colour::Value(3) => "3.png".to_string(),
+            rustris::Colour::Value(4) => "4.png".to_string(),
+            rustris::Colour::Value(5) => "5.png".to_string(),
+            rustris::Colour::Value(6) => "6.png".to_string(),
+            _ => "none.png".to_string(),
         }
     }
 
@@ -69,7 +61,7 @@ impl Sdl {
  *  33  0     33   655  21     52
  *  33  6666  33   6 5 2211   222
  */
-    fn draw_title(&mut self) {
+    fn draw_title(&mut self, texture_manager: &mut TextureManager<T>) -> Result<(), String> {
         let blocks: Vec<(isize, isize, rustris::Colour)> = vec![
             // T
             (1, 1, rustris::Colour::Value(1)),
@@ -158,35 +150,30 @@ impl Sdl {
 
         for block in blocks {
             let (x, y, colour) = block;
-            self.draw_title_block(x, y, colour);
+
+            let texture_name = Sdl::<T>::get_texture_name(colour);
+            let texture = texture_manager.load(&texture_name)?;
+
+            self.draw_title_block(x, y, &texture);
         }
+
+        Ok(())
     }
 
-    fn draw_title_block(&mut self, x: isize, y: isize, colour: rustris::Colour) {
-        let c = Sdl::get_color(colour);
-
+    fn draw_title_block(&mut self, x: isize, y: isize, texture: &sdl2::render::Texture) {
         let top_left = self.title_top_left.unwrap();
 
-        self.canvas.set_draw_color(c);
-
         let r = sdl2::rect::Rect::new(
             top_left.x + (x as i32 * top_left.w),
             top_left.y + (y as i32 * top_left.h),
             top_left.w as u32,
             top_left.h as u32);
 
-        self.canvas.fill_rect(r).unwrap();
-
-        self.canvas.set_draw_color(sdl2::pixels::Color::BLACK);
-        self.canvas.draw_rect(r).unwrap();
+        self.canvas.copy(texture, None, r);
     }
 
-    fn draw_block(&mut self, x: isize, y: isize, colour: rustris::Colour) {
-        let c = Sdl::get_color(colour);
-
+    fn draw_block(&mut self, x: isize, y: isize, texture: &sdl2::render::Texture) {
         let top_left = self.board_top_left.unwrap();
-
-        self.canvas.set_draw_color(c);
 
         let r = sdl2::rect::Rect::new(
             top_left.x + (x as i32 * top_left.w),
@@ -194,18 +181,15 @@ impl Sdl {
             top_left.w as u32,
             top_left.h as u32);
 
-        self.canvas.fill_rect(r).unwrap();
-
-        self.canvas.set_draw_color(sdl2::pixels::Color::BLACK);
-        self.canvas.draw_rect(r).unwrap();
+        self.canvas.copy(texture, None, r);
     }
 }
 
-impl Output for Sdl {
+impl <T> Output<T> for Sdl<T> {
     fn reset(&mut self) {
     }
 
-    fn show_message(&mut self, message: String) {
+    fn show_message(&mut self, _message: String) {
     }
 
     fn init_game(&mut self, game: &Game) {
@@ -226,7 +210,7 @@ impl Output for Sdl {
         let desired_screen_w = w * 80 / 100;
         let desired_screen_h = h;
 
-        let (actual_screen_w, actual_screen_h) = Sdl::resize(
+        let (actual_screen_w, actual_screen_h) = Sdl::<T>::resize(
             current_screen_w,
             current_screen_h,
             desired_screen_w,
@@ -248,26 +232,33 @@ impl Output for Sdl {
             block_h));
     }
 
-    fn show_game(&mut self, game: &Game) {
+    fn show_game(&mut self, game: &Game, texture_manager: &mut TextureManager<T>) -> Result<(), String> {
         self.canvas.set_draw_color(sdl2::pixels::Color::RGB(96, 0, 0));
         self.canvas.clear();
 
-        self.draw_title();
+        self.draw_title(texture_manager);
 
         let (w, h) = game.dims();
 
+        let wall_texture = texture_manager.load("wall.png")?;
+
         for y in 0..h {
-            self.draw_block(0, y, rustris::Colour::Wall);
+            self.draw_block(0, y, &wall_texture);
             for x in 0..w {
-                self.draw_block(1+x, y, game.display_get(x, y));
+                let texture_name = Sdl::<T>::get_texture_name(game.display_get(x, y));
+                let texture = texture_manager.load(&texture_name)?;
+
+                self.draw_block(1+x, y, &texture);
             }
-            self.draw_block(w+1, y, rustris::Colour::Wall);
+            self.draw_block(w+1, y, &wall_texture);
         }
 
         for x in 0..w+2 {
-            self.draw_block(x, h, rustris::Colour::Wall);
+            self.draw_block(x, h, &wall_texture);
         }
 
         self.canvas.present();
+
+        Ok(())
     }
 }
